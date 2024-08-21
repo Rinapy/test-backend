@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator
 
 from core.enums import Limits
+from users.models import Subscription
 
 User = get_user_model()
 
@@ -29,12 +30,12 @@ class Course(models.Model):
         verbose_name='Дата и время начала курса'
     )
 
-    # subscribers = models.ManyToManyField(
-    #     User,
-    #     related_name='courses_subscribers',
-    #     blank=True,
-    #     verbose_name='Подписчики курса',
-    # )
+    subscribers = models.ManyToManyField(
+        Subscription,
+        related_name='courses_subscribers',
+        blank=True,
+        verbose_name='Подписчики курса',
+    )
 
     price = models.PositiveIntegerField(
         verbose_name='Цена курса',
@@ -53,6 +54,24 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title
+    
+    def is_available_for(self, user):
+        """
+        Проверяет, доступен ли курс для покупки конкретным пользователем.
+
+        Возвращает два значения:
+        1. bool: Доступен ли курс по балансу пользователя.
+        2. bool: Приобрел ли пользователь этот курс ранее.
+        """
+        
+        has_sufficient_balance = user.balance.amount >= self.price
+        has_already_purchased = self.subscribers.filter(id=user.id).exists()
+
+        return has_sufficient_balance, has_already_purchased
+            
+    def get_subscribers(self):
+        return ", ".join([str(subscriber) for subscriber in self.subscribers.all()])
+    get_subscribers.short_description = 'Состав группы'
 
 
 class Lesson(models.Model):
@@ -88,8 +107,9 @@ class Group(models.Model):
 
     course = models.ForeignKey(
         Course,
-        on_delete=models.CASCAD,
-        related_name='Группа курса'
+        on_delete=models.CASCADE,
+        related_name='group_course',
+        verbose_name='Группа курса'
     )
 
     subscribers = models.ManyToManyField(
@@ -105,4 +125,8 @@ class Group(models.Model):
         ordering = ('-id',)
 
     def __str__(self) -> str:
-        return f'Группа курса'
+        return f'Группа курса {self.course.title}'
+    
+    def get_subscribers(self):
+        return ", ".join([str(subscriber) for subscriber in self.subscribers.all()])
+    get_subscribers.short_description = 'Состав группы'

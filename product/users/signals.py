@@ -5,8 +5,10 @@ from .models import CustomUser, Balance
 
 
 @receiver(post_save, sender=CustomUser)
-def create_balance(sender, instance, created, **kwargs):
+def create_balance(sender, instance: CustomUser, created, **kwargs):
     """Сигнал создания баланса для нового пользователя."""
 
     if created:
-        Balance.objects.create(user=instance)
+        instance.balance = Balance.objects.create()
+        instance.save()
+

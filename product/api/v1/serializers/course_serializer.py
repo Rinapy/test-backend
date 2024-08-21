@@ -49,11 +49,11 @@ class StudentSerializer(serializers.ModelSerializer):
 class GroupSerializer(serializers.ModelSerializer):
     """Список групп."""
 
-    # TODO Доп. задание
-
     class Meta:
         model = Group
-
+        fields = (
+            '__all__'
+        )
 
 class CreateGroupSerializer(serializers.ModelSerializer):
     """Создание групп."""
@@ -61,7 +61,6 @@ class CreateGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = (
-            'title',
             'course',
         )
 
@@ -82,25 +81,25 @@ class CourseSerializer(serializers.ModelSerializer):
     lessons = MiniLessonSerializer(many=True, read_only=True)
     lessons_count = serializers.SerializerMethodField(read_only=True)
     students_count = serializers.SerializerMethodField(read_only=True)
-    groups_filled_percent = serializers.SerializerMethodField(read_only=True)
     demand_course_percent = serializers.SerializerMethodField(read_only=True)
 
     def get_lessons_count(self, obj):
         """Количество уроков в курсе."""
-        # TODO Доп. задание
+
+        return obj.lessons.count()
 
     def get_students_count(self, obj):
         """Общее количество студентов на курсе."""
-        # TODO Доп. задание
 
-    def get_groups_filled_percent(self, obj):
-        """Процент заполнения групп, если в группе максимум 30 чел.."""
-        # TODO Доп. задание
-
+        return obj.subscribers.count()
+    
     def get_demand_course_percent(self, obj):
         """Процент приобретения курса."""
-        # TODO Доп. задание
 
+        user_count = User.objects.count()
+        subs_count = obj.subscribers.count()
+        return f'{user_count/100 * subs_count}%'
+    
     class Meta:
         model = Course
         fields = (
@@ -113,12 +112,46 @@ class CourseSerializer(serializers.ModelSerializer):
             'lessons',
             'demand_course_percent',
             'students_count',
-            'groups_filled_percent',
         )
 
+class AvailableCourseSerializer(serializers.ModelSerializer):
+    """Список доступных курсов."""
+
+    lessons_count = serializers.SerializerMethodField(read_only=True)
+    students_count = serializers.SerializerMethodField(read_only=True)
+    buy_available = serializers.SerializerMethodField(read_only=True)
+
+
+    def get_lessons_count(self, obj):
+        """Количество уроков в курсе."""
+        return obj.lessons.count()
+
+    def get_students_count(self, obj):
+        """Общее количество студентов на курсе."""
+        return obj.subscribers.count()
+    
+    def get_buy_available(self, obj):
+        user = self.context['request'].user
+        buy_available, _ = obj.is_available_for(user)
+        return buy_available
+
+    class Meta:
+        model = Course
+        fields = (
+            'author',
+            'title',
+            'start_date',
+            'price',
+            'lessons_count',
+            'students_count',
+            'buy_available',
+        )
 
 class CreateCourseSerializer(serializers.ModelSerializer):
     """Создание курсов."""
 
     class Meta:
         model = Course
+        fields = (
+            '__all__'
+        )

@@ -1,11 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import MinValueValidator
-from django.db.models import UniqueConstraint, CheckConstraint
-from django.db.models import F
-
-from courses.models import Group
-
+from django.db.models import UniqueConstraint, Q
 from core.enums import Limits
 
 
@@ -18,15 +14,18 @@ class CustomUser(AbstractUser):
         max_length=250
     )
 
-    balance = models.ForeignKey(
+    balance = models.OneToOneField(
         'Balance',
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         verbose_name='Баланс пользователя',
-        related_name='balance'
+        related_name='user',
+        null=True,
+        blank=True,
     )
 
-    is_author = models.BooleanField(
-        verbose_name='Пользователь являеться преподователем.'
+    is_creator = models.BooleanField(
+        verbose_name='Пользователь может создавать курсы.',
+        default=False,
     )
 
     USERNAME_FIELD = 'email'
@@ -50,8 +49,8 @@ class Balance(models.Model):
     """Модель баланса пользователя."""
 
     amount = models.PositiveIntegerField(
-        verbose_name='Баланс',
-        default=1000,
+        verbose_name='Доступный баланс',
+        default=Limits.START_BALANCE,
         validators=[
             MinValueValidator(
                 Limits.MIN_BALANCE_AMOUNT,
@@ -71,21 +70,15 @@ class Subscription(models.Model):
 
     user = models.ForeignKey(
         CustomUser,
-        related_name='subscriber',
+        related_name='subscriptions',
         verbose_name="Подписчик",
         on_delete=models.CASCADE,
     )
-    # course = models.ForeignKey(
-    #     Course,
-    #     related_name='subscribing',
-    #     verbose_name="Курс",
-    #     on_delete=models.CASCADE,
-    # )
-    group = models.ManyToManyField(
-        Group,
-        related_name='subscribers',
+    course = models.ForeignKey(
+        'courses.Course',
+        related_name='subscriptions',
+        verbose_name="Курс",
         on_delete=models.CASCADE,
-        verbose_name='Группа',
     )
 
     class Meta:
@@ -94,9 +87,6 @@ class Subscription(models.Model):
         ordering = ('-id',)
         constraints = [
             UniqueConstraint(
-                fields=['user', 'group__course'],
+                fields=['user', 'course'],
                 name='unique_subscription'),
-            CheckConstraint(
-                check=~(models.Q(user=F('group__course__author'))),
-                name='author_cannot_subscribe_to_own_course')
         ]
